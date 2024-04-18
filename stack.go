@@ -22,9 +22,9 @@ func (kv *KvStore) Peek() *Transaction {
 	return kv.stack.top
 }
 
-func (kv *KvStore) Pop() error {
+func (kv *KvStore) Pop() (*Transaction, error) {
 	if kv.stack.size <= 0 {
-		return ErrEmptyStack
+		return nil, ErrEmptyStack
 	}
 
 	currTop := kv.Peek()
@@ -32,7 +32,7 @@ func (kv *KvStore) Pop() error {
 	kv.stack.top = currTop.next
 	kv.stack.size--
 
-	return nil
+	return currTop, nil
 }
 
 func (kv *KvStore) Push(t *Transaction) {

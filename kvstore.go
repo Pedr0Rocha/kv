@@ -66,24 +66,26 @@ func (kv *KvStore) Begin() {
 }
 
 func (kv *KvStore) Commit() error {
-	currTrans := kv.Peek()
+	currTrans, err := kv.Pop()
 
-	if currTrans == nil {
-		slog.Error("Commit failed. No active transaction.")
-		return ErrNoActiveTransaction
+	if err != nil {
+		if err == ErrEmptyStack {
+			slog.Error("Rollback failed. No active transaction.")
+			return ErrNoActiveTransaction
+		}
+		slog.Error("Commit failed.")
+		return err
 	}
 
 	for k, v := range currTrans.local {
 		kv.store[k] = v
 	}
 
-	kv.Pop()
-
 	return nil
 }
 
 func (kv *KvStore) Rollback() error {
-	if err := kv.Pop(); err != nil {
+	if _, err := kv.Pop(); err != nil {
 		if err == ErrEmptyStack {
 			slog.Error("Rollback failed. No active transaction.")
 			return ErrNoActiveTransaction
