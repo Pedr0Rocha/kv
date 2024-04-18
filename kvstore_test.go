@@ -2,6 +2,7 @@ package main
 
 import (
 	"testing"
+	"time"
 )
 
 // clear store and kvStore.for every test
@@ -14,7 +15,7 @@ func resetAllWrapper(t *testing.T, name string, testFunc func(t *testing.T)) {
 
 func TestKvStore(t *testing.T) {
 	resetAllWrapper(t, "should insert into global store", func(t *testing.T) {
-		kvStore.Put("test", 1)
+		kvStore.Put("test", 1, nil)
 
 		if kvStore.Get("test") != 1 {
 			t.Errorf("not inserted. expected=%d, got=%d", 1, kvStore.Get("test"))
@@ -22,10 +23,10 @@ func TestKvStore(t *testing.T) {
 	})
 
 	resetAllWrapper(t, "should insert and update into global store", func(t *testing.T) {
-		kvStore.Put("test", 1)
-		kvStore.Put("test2", 1)
-		kvStore.Put("test2", 5)
-		kvStore.Put("test", 2)
+		kvStore.Put("test", 1, nil)
+		kvStore.Put("test2", 1, nil)
+		kvStore.Put("test2", 5, nil)
+		kvStore.Put("test", 2, nil)
 
 		if kvStore.Get("test") != 2 {
 			t.Errorf("not inserted/updated. expected=%d, got=%d", 2, kvStore.Get("test"))
@@ -36,8 +37,8 @@ func TestKvStore(t *testing.T) {
 	})
 
 	resetAllWrapper(t, "should delete from global store", func(t *testing.T) {
-		kvStore.Put("test", 2)
-		kvStore.Put("test2", 5)
+		kvStore.Put("test", 2, nil)
+		kvStore.Put("test2", 5, nil)
 
 		kvStore.Delete("test2")
 
@@ -50,18 +51,28 @@ func TestKvStore(t *testing.T) {
 	})
 }
 
+func TestKvStoreWithTtl(t *testing.T) {
+	resetAllWrapper(t, "should insert into global store with ttl", func(t *testing.T) {
+		ttl := time.Duration(50 * time.Millisecond)
+		kvStore.Put("test", 1, &ttl)
+
+		time.Sleep(100 * time.Millisecond)
+
+		if value := kvStore.Get("test"); value != -1 {
+			t.Errorf("key did not expire. expected=%d, got=%d", -1, value)
+		}
+	})
+}
+
 func TestKvStoreTransaction(t *testing.T) {
 	resetAllWrapper(t, "should create and commit transaction", func(t *testing.T) {
-		kvStore.Put("test", 1)
+		kvStore.Put("test", 1, nil)
 
 		kvStore.Begin()
-
-		kvStore.Put("test", 10)
-
+		kvStore.Put("test", 10, nil)
 		if kvStore.Get("test") != 1 {
 			t.Errorf("modified global store. expected=%d, got=%d", 1, kvStore.Get("test"))
 		}
-
 		kvStore.Commit()
 
 		if kvStore.Get("test") != 10 {
@@ -70,16 +81,13 @@ func TestKvStoreTransaction(t *testing.T) {
 	})
 
 	resetAllWrapper(t, "should rollback transaction", func(t *testing.T) {
-		kvStore.Put("test", 1)
+		kvStore.Put("test", 1, nil)
 
 		kvStore.Begin()
-
-		kvStore.Put("test", 10)
-
+		kvStore.Put("test", 10, nil)
 		if kvStore.Get("test") != 1 {
 			t.Errorf("modified global store. expected=%d, got=%d", 1, kvStore.Get("test"))
 		}
-
 		kvStore.Rollback()
 
 		if kvStore.Get("test") != 1 {
@@ -88,37 +96,28 @@ func TestKvStoreTransaction(t *testing.T) {
 	})
 
 	resetAllWrapper(t, "should handle nested transactions", func(t *testing.T) {
-		kvStore.Put("test", 1)
+		kvStore.Put("test", 1, nil)
 
 		// first T
 		kvStore.Begin()
-
-		kvStore.Put("test", 10)
-
+		kvStore.Put("test", 10, nil)
 		if kvStore.Get("test") != 1 {
 			t.Errorf("modified global store. expected=%d, got=%d", 1, kvStore.Get("test"))
 		}
-
-		if kvStore.Peek().local["test"] != 10 {
-			t.Errorf("not modified kvStore. expected=%d, got=%d", 10, kvStore.Peek().local["test"])
+		if kvStore.Peek().local["test"].value != 10 {
+			t.Errorf("not modified kvStore. expected=%d, got=%d", 10, kvStore.Peek().local["test"].value)
 		}
-
 		// nested T
 		kvStore.Begin()
-
 		if kvStore.Get("test") != 1 {
 			t.Errorf("modified global store. expected=%d, got=%d", 1, kvStore.Get("test"))
 		}
-
-		kvStore.Put("test", 20)
-
+		kvStore.Put("test", 20, nil)
 		if kvStore.stack.size != 2 {
 			t.Errorf("wrong kvStore.size. expected=%d, got=%d", 2, kvStore.stack.size)
 		}
-
 		// end nested T
 		kvStore.Commit()
-
 		if kvStore.Get("test") != 20 {
 			t.Errorf("did not modified global store. expected=%d, got=%d", 20, kvStore.Get("test"))
 		}

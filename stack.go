@@ -6,6 +6,20 @@ import (
 
 var ErrEmptyStack = errors.New("ErrEmptyStack")
 
+type Transaction struct {
+	local KvMap
+	next  *Transaction
+}
+
+func NewTransaction() *Transaction {
+	return &Transaction{
+		local: make(KvMap),
+		next:  nil,
+	}
+}
+
+// This is a linked list implementation of a stack.
+// It can also be done with a []int
 type Stack struct {
 	top  *Transaction
 	size int
